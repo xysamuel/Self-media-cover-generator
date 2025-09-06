@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>封面生成器 Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;700;900&family=Noto+Serif+SC:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="favicon.png" type="image/png">
+    <style>
+        svg { position: absolute; width: 0; height: 0; pointer-events: none; }
+        @font-face {
+            font-family: 'Hui Wen Ming Chao Ti';
+            src: url('Huiwenmincho-improved.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        :root {
+            --accent-color: #00ff41;
+            --accent-shadow: rgba(0,255,65,0.4);
+            --main-font: 'Hui Wen Ming Chao Ti', 'Noto Serif SC', serif;
+            --mono-font: 'JetBrains Mono', monospace;
+            --gradient-start-color: #CCE4F6;
+            --gradient-end-color: #8AB6E6;
+            --gradient-middle-color: #A8D0FF;
+            --noise-opacity: 0.05;
+            --noise-base-frequency: 0.08;
+            --noise-blend-mode: overlay;
+        }
+        body { font-family: var(--main-font); background: #000; color: #fff; margin: 0; padding: 0; min-height: 100vh; display: flex; }
+        .main-layout { display: flex; width: 100%; min-height: 100vh; }
+        .content-area { flex: 1; padding: 20px; padding-right: 370px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+        .sidebar { width: 350px; background: #111; border-left: 1px solid #333; padding: 20px; box-sizing: border-box; position: fixed; right: 0; top: 0; height: 100vh; overflow-y: auto; }
+        .cover-container { width: 100%; max-width: 900px; aspect-ratio: 3.35/1; display: flex; position: relative; background: radial-gradient(circle at var(--gradient-position-x) var(--gradient-position-y), var(--gradient-start-color) 0%, var(--gradient-middle-color) 50%, var(--gradient-end-color) 100%); border: 1px solid #333; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .cover-container:hover { transform: scale(1.01); box-shadow: 0 0 15px var(--accent-shadow); }
+        .main-cover, .single-main-cover { position: relative; padding: 15px; box-sizing: border-box; width: 100%; height: 100%; }
+        .main-cover { width: 70.15%; }
+        .share-cover { width: 29.85%; position: relative; padding: 10px; box-sizing: border-box; }
+        
+        .title-main, .share-text-content { 
+            position: absolute;
+            z-index: 10; 
+            cursor: grab;
+            width: auto;
+            max-width: calc(100% - 30px);
+            word-wrap: break-word; overflow-wrap: break-word; 
+            font-family: var(--main-font);
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .title-main { 
+            font-size: clamp(20px, 3.5vw, 40px); 
+            font-weight: 900; line-height: 1.0; text-align: left; 
+            display: flex; flex-direction: column;
+            justify-content: center;
+            align-items: stretch; /* Changed from flex-start to allow per-line alignment */
+        }
+        .share-text-content {
+            font-size: clamp(16px, 2.5vw, 32px); line-height: 1.2; letter-spacing: 0.1em; font-weight: 900; text-align: center; color: #fff; white-space: nowrap;
+        }
+
+        .title-line { 
+            display: flex; /* Changed from block */
+            width: 100%; /* Added */
+            position: relative; 
+            margin-bottom: 8px; 
+            white-space: nowrap; 
+        }
+        .noise-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: var(--noise-opacity); filter: url(#noiseFilter); mix-blend-mode: var(--noise-blend-mode); z-index: 5; background-color: transparent; }
+        .grid-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 20px 20px; pointer-events: none; z-index: 6; }
+        .accent-line { position: absolute; background: var(--accent-color); }
+        .accent-line-1 { width: 2px; height: 60px; top: 20px; left: 20px; transform: rotate(-45deg); }
+        .accent-line-2 { width: 40px; height: 1px; bottom: 30px; right: 30px; }
+        .corner-frame { position: absolute; width: 20px; height: 20px; border: 1px solid rgba(255,255,255,0.3); }
+        .corner-frame-1 { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+        .corner-frame-2 { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+        .download-btn { padding: 12px 24px; background: var(--accent-color); color: #000; border: none; font-weight: 700; cursor: pointer; font-family: var(--mono-font); transition: all 0.3s ease; }
+        .download-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--accent-shadow); }
+        .input-panel { background: transparent; border: none; padding: 0; margin-bottom: 20px; width: 100%; }
+        .input-group { margin-bottom: 15px; }
+        .input-label { display: block; color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+        .input-field { width: 100%; background: #222; border: 1px solid #444; border-radius: 4px; padding: 10px; color: #fff; font-size: 14px; font-family: 'Noto Sans SC', sans-serif; }
+        .input-field:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(0,255,65,0.2); }
+        .textarea-field { resize: vertical; min-height: 100px; }
+        .covers-grid { display: flex; flex-direction: column; gap: 30px; width: 100%; max-width: 1000px; }
+        .cover-item { width: 100%; }
+        .cover-title { color: #fff; font-size: 16px; font-weight: 600; margin-bottom: 10px; text-align: center; }
+        .ratio-3-35-1 { aspect-ratio: 3.35/1; display: flex; flex-direction: row; }
+        .ratio-16-9 { aspect-ratio: 16/9; }
+        .ratio-9-16 { aspect-ratio: 9/16; max-width: 400px; margin: 0 auto; }
+        .ratio-3-4 { aspect-ratio: 3/4; max-width: 500px; margin: 0 auto; }
+        .ratio-4-3 { aspect-ratio: 4/3; }
+        .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; margin-right: 10px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:focus + .slider { box-shadow: 0 0 1px var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(16px); }
+        input[type="range"] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; border: 1px solid #000; height: 16px; width: 16px; border-radius: 50%; background: var(--accent-color); cursor: pointer; margin-top: -6px; box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d; }
+        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #444; border-radius: 2px; border: 0.2px solid #010101; }
+        input[type="range"]::-moz-range-thumb { box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d; border: 1px solid #000; height: 16px; width: 16px; border-radius: 50%; background: var(--accent-color); cursor: pointer; }
+        input[type="range"]::-moz-range-track { width: 100%; height: 4px; cursor: pointer; background: #444; border-radius: 2px; border: 0.2px solid #010101; }
+        .pos-indicator { font-family: var(--mono-font); font-size: 0.7em; color: #ccc; margin-top: 5px; text-align: center; }
+
+        /* --- 经典科技风格 --- */
+        .style-classic .cover-container {
+            background: #000;
+        }
+        .style-classic .ratio-3-35-1 .main-cover {
+            border-right: 1px solid #333;
+        }
+        .style-classic .main-cover { padding: 15px; }
+        .style-classic .share-cover { padding: 10px; }
+        .style-classic .single-main-cover { padding: 20px; }
+
+        .style-classic .main-cover, 
+        .style-classic .single-main-cover,
+        .style-classic .share-cover {
+            align-items: center;
+            justify-content: center;
+            display: flex;
+        }
+        .style-classic .title-main, .style-classic .share-text-content {
+            position: relative;
+            left: auto !important; /* Override inline styles */
+            top: auto !important; /* Override inline styles */
+            transform: none;
+            cursor: default;
+            width: 100%;
+        }
+        
+        .style-classic .title-line {
+            color: #fff; /* Reset color */
+        }
+        .style-classic .title-line:nth-child(1) {
+            font-size: 1.2em;
+            color: var(--accent-color);
+        }
+        .style-classic .title-line:nth-child(2) {
+            font-size: 0.8em;
+            opacity: 0.9;
+        }
+        .style-classic .title-line:nth-child(3) {
+            font-size: 0.6em;
+            opacity: 0.7;
+            font-family: var(--mono-font);
+        }
+        .style-classic .share-text-content .text-row {
+            font-size: clamp(16px, 2.5vw, 32px);
+            line-height: 1.2;
+            letter-spacing: 0.1em;
+            font-weight: 900;
+            text-align: center;
+            color: #fff;
+            margin: 4px 0;
+            width: 100%;
+            white-space: nowrap; /* Bug Fix: Prevent wrapping */
+        }
+        /* 隐藏Pro风格的控件 */
+        .style-classic .pro-feature {
+            display: none !important;
+        }
+
+        @media (max-width: 1200px) { .sidebar { position: relative; width: 100%; height: auto; border-left: none; border-bottom: 1px solid #333; order: -1; } .content-area { padding-right: 20px; } .main-layout { flex-direction: column; } }
+        @media (max-width: 768px) { .content-area { padding: 10px; } .main-cover { padding: 10px; } .title-main { font-size: clamp(16px, 3vw, 32px); } .share-text-content { font-size: clamp(14px, 2vw, 24px); } }
+    </style>
+</head>
+<body>
+    <svg>
+        <filter id='noiseFilter'>
+            <feTurbulence type='fractalNoise' baseFrequency='var(--noise-base-frequency)' numOctaves='3' stitchTiles='stitch'/>
+        </filter>
+    </svg>
+
+    <div class="main-layout">
+        <div class="content-area">
+            <div class="covers-grid">
+                <div class="cover-item"><h3 class="cover-title">3.35:1 (公众号封面) - 点击下载</h3><div class="cover-container ratio-3-35-1" data-ratio="3.35:1"><div class="noise-overlay"></div> <div class="main-cover"><div class="grid-overlay"></div><div class="corner-frame corner-frame-1"></div><div class="corner-frame corner-frame-2"></div><div class="accent-line accent-line-1"></div><div class="accent-line accent-line-2"></div><div class="title-main" data-target="main-title"></div></div><div class="share-cover"><div class="grid-overlay"></div><div class="share-text-content" data-target="share-text"></div></div></div></div>
+                <div class="cover-item"><h3 class="cover-title">16:9 (横屏) - 点击下载</h3><div class="cover-container ratio-16-9" data-ratio="16:9"><div class="noise-overlay"></div> <div class="single-main-cover"><div class="grid-overlay"></div><div class="corner-frame corner-frame-1"></div><div class="corner-frame corner-frame-2"></div><div class="accent-line accent-line-1"></div><div class="accent-line accent-line-2"></div><div class="title-main" data-target="main-title"></div></div></div></div>
+                <div class="cover-item"><h3 class="cover-title">9:16 (竖屏) - 点击下载</h3><div class="cover-container ratio-9-16" data-ratio="9:16"><div class="noise-overlay"></div> <div class="single-main-cover"><div class="grid-overlay"></div><div class="corner-frame corner-frame-1"></div><div class="corner-frame corner-frame-2"></div><div class="accent-line accent-line-1"></div><div class="accent-line accent-line-2"></div><div class="title-main" data-target="main-title"></div></div></div></div>
+                <div class="cover-item"><h3 class="cover-title">3:4 (竖屏) - 点击下载</h3><div class="cover-container ratio-3-4" data-ratio="3:4"><div class="noise-overlay"></div> <div class="single-main-cover"><div class="grid-overlay"></div><div class="corner-frame corner-frame-1"></div><div class="corner-frame corner-frame-2"></div><div class="accent-line accent-line-1"></div><div class="accent-line accent-line-2"></div><div class="title-main" data-target="main-title"></div></div></div></div>
+                <div class="cover-item"><h3 class="cover-title">4:3 (横屏) - 点击下载</h3><div class="cover-container ratio-4-3" data-ratio="4:3"><div class="noise-overlay"></div> <div class="single-main-cover"><div class="grid-overlay"></div><div class="corner-frame corner-frame-1"></div><div class="corner-frame corner-frame-2"></div><div class="accent-line accent-line-1"></div><div class="accent-line accent-line-2"></div><div class="title-main" data-target="main-title"></div></div></div></div>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="input-panel">
+                <!-- 新增：风格切换 -->
+                <div class="input-group">
+                    <label class="input-label">风格切换</label>
+                    <div class="flex items-center">
+                        <span class="text-sm mr-2">Pro</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="styleToggle">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="text-sm">经典科技风</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">主封面标题 (每行一个)</label>
+                    <textarea class="input-field textarea-field" id="mainTitleInput" placeholder="请输入主封面标题，每行一个内容，最多4行">欢迎测试使用
+感谢反馈</textarea>
+                    <div id="mainTitlePosIndicator" class="pos-indicator pro-feature">L: 50%, T: 50%</div>
+                </div>
+
+                <div class="input-group pro-feature" id="perLineControls">
+                    <label class="input-label">标题行样式</label>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">分享封面文字</label>
+                    <input type="text" class="input-field" id="shareTextInput" placeholder="Pro风格: 一行内容 | 经典风格: 空格分隔两行" value="@观澜话不多" maxlength="100">
+                    <div id="shareTextPosIndicator" class="pos-indicator pro-feature">L: 50%, T: 50%</div>
+                </div>
+                
+                <div class="input-group pro-feature">
+                    <label class="input-label">字体选择</label>
+                    <select id="fontSelector" class="input-field">
+                        <option value="Hui Wen Ming Chao Ti" selected>汇文明朝体 (本地)</option>
+                        <option value="ZCOOL KuaiLe">站酷快乐体</option>
+                        <option value="Noto Serif SC">思源宋体</option>
+                        <option value="Noto Sans SC">思源黑体</option>
+                        <option value="JetBrains Mono">JetBrains Mono (代码)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">装饰元素</label>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center"><label class="toggle-switch"><input type="checkbox" id="toggleGrid" checked><span class="slider"></span></label><span class="text-sm">网格背景</span></div>
+                        <div class="flex items-center"><label class="toggle-switch"><input type="checkbox" id="toggleCorners" checked><span class="slider"></span></label><span class="text-sm">角落边框</span></div>
+                        <div class="flex items-center"><label class="toggle-switch"><input type="checkbox" id="toggleAccents" checked><span class="slider"></span></label><span class="text-sm">装饰线条</span></div>
+                    </div>
+                </div>
+                <div class="input-group pro-feature">
+                    <label class="input-label">三色径向渐变背景</label>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-2">
+                        <div class="flex items-center gap-2"><span class="text-sm w-12">起始色:</span><input type="color" id="gradientStartColorPicker" value="#c8dbea" class="w-10 h-8 p-1 bg-[#222] border border-solid border-[#444] rounded-md cursor-pointer"></div>
+                        <div class="flex items-center gap-2"><span class="text-sm w-12">中间色:</span><input type="color" id="gradientMiddleColorPicker" value="#0b7af9" class="w-10 h-8 p-1 bg-[#222] border border-solid border-[#444] rounded-md cursor-pointer"></div>
+                        <div class="flex items-center gap-2"><span class="text-sm w-12">结束色:</span><input type="color" id="gradientEndColorPicker" value="#8ab6e6" class="w-10 h-8 p-1 bg-[#222] border border-solid border-[#444] rounded-md cursor-pointer"></div>
+                    </div>
+                    <label class="input-label">中间色位置: <span id="gradientMiddlePositionValue">50%</span></label>
+                    <input type="range" id="gradientMiddlePositionSlider" min="0" max="100" value="57" class="w-full">                    
+                    <label class="input-label mt-2">渐变中心X轴: <span id="gradientPosXValue">50%</span></label>
+                    <input type="range" id="gradientPosXSlider" min="0" max="100" value="50" class="w-full">
+                    <label class="input-label mt-2">渐变中心Y轴: <span id="gradientPosYValue">50%</span></label>
+                    <input type="range" id="gradientPosYSlider" min="0" max="100" value="50" class="w-full">
+                    <label class="input-label mt-2">渐变中心预设:</label>
+                    <select id="gradientPositionSelector" class="input-field">
+                        <option value="custom" disabled>自定义</option>
+                        <option value="center">中心</option><option value="top left">左上</option><option value="top right">右上</option><option value="bottom left">左下</option><option value="bottom right">右下</option>
+                    </select>
+                    <div class="flex gap-2 mt-2 flex-wrap">
+                        <button class="px-3 py-1 bg-[#222] border border-[#444] rounded text-white text-sm hover:bg-[#333]" onclick="setGradientPreset(0)">深海沉思</button>
+                        <button class="px-3 py-1 bg-[#222] border border-[#444] rounded text-white text-sm hover:bg-[#333]" onclick="setGradientPreset(1)">落日余晖</button>
+                        <button class="px-3 py-1 bg-[#222] border border-[#444] rounded text-white text-sm hover:bg-[#333]" onclick="setGradientPreset(2)">青草大地</button>
+                        <button class="px-3 py-1 bg-[#222] border border-[#444] rounded text-white text-sm hover:bg-[#333]" onclick="setGradientPreset(3)">清晨薄雾</button>
+                    </div>
+                </div>
+                <div class="input-group pro-feature">
+                    <label class="input-label">噪点叠加</label>
+                    <div class="flex items-center gap-2 mb-2"><label class="toggle-switch"><input type="checkbox" id="toggleNoise" checked><span class="slider"></span></label><span class="text-sm">启用噪点</span></div>
+                    <label class="input-label">不透明度: <span id="noiseOpacityValue">5%</span></label>
+                    <input type="range" id="noiseOpacitySlider" min="0" max="25" value="25" class="w-full">
+                    <label class="input-label">噪点密度: <span id="noiseDensityValue">8%</span></label>
+                    <input type="range" id="noiseDensitySlider" min="8" max="20" value="8" class="w-full">
+                    <label class="input-label">混合模式:</label>
+                    <select id="noiseBlendModeSelector" class="input-field">
+                        <option value="overlay">Overlay (叠加)</option><option value="multiply">Multiply (正片叠底)</option>
+                    </select>
+                </div>
+                <div class="input-group pro-feature">
+                    <label class="input-label">背景图片 (可选，会覆盖渐变)</label>
+                    <div class="flex items-center gap-2">
+                         <input type="file" id="bgImageUpload" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-gray-700 hover:file:bg-violet-100 bg-[#222] border border-solid border-[#444] rounded-md"/>
+                        <button id="removeBgImage" class="p-2.5 bg-red-500 text-white rounded-md hover:bg-red-600" title="移除背景图片"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="input-group">
+                <label class="input-label">配置管理</label>
+                <div class="flex gap-2">
+                    <button id="exportSettingsBtn" class="flex-1 px-3 py-1 bg-[#222] border border-[#444] rounded text-white text-sm hover:bg-[#333]"><i class="fas fa-file-export mr-2"></i>导出配置</button>
+                    <input type="file" id="importSettingsInput" accept=".json" class="hidden">
+                    <label for="importSettingsInput" id="importSettingsBtn" class="flex-1 cursor-pointer text-center px-3 py-1 bg-[#222] border border-[#444] rounded text-white text-sm hover:bg-[#333]"><i class="fas fa-file-import mr-2"></i>导入配置</label>
+                </div>
+            </div>
+            <button class="download-btn mt-4 w-full" onclick="downloadAllImages()"><i class="fas fa-download mr-2"></i>下载所有尺寸</button>
+            <p class="text-sm text-gray-400 mt-4 text-right">创意来自@归藏</p>
+            <p class="text-sm text-gray-400 mt-4 text-right">Created By @张佳 & cursor&观澜话不多</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        const config = {
+            accentColors: [ '#00ff41', '#ff0080', '#00bfff', '#ff6b35', '#9d4edd', '#06ffa5', '#ffbe0b', '#fb5607' ],
+            gradientPresets: [
+                { name: '深海沉思', start: '#CCE4F6', middle: '#A8D0FF', end: '#8AB6E6', middlePosition: 50, posX: 50, posY: 50 },
+                { name: '落日余晖', start: '#ffb5a7', middle: '#fcd5ce', end: '#f8edeb', middlePosition: 50, posX: 50, posY: 50 },
+                { name: '青草大地', start: '#d4a373', middle: '#faedcd', end: '#fefae0', middlePosition: 40, posX: 50, posY: 50 },
+                { name: '清晨薄雾', start: '#a2d2ff', middle: '#bde0fe', end: '#eaf4f4', middlePosition: 60, posX: 50, posY: 50 },
+            ],
+            defaultTitlePos: { left: 50, top: 50 },
+            defaultSharePos: { left: 50, top: 50 }
+        };
+
+        let currentStyle = 'pro'; // 'pro' 或 'classic'
+        let currentBackgroundImage = '';
+        let currentGradient = { start: '#c8dbea', middle: '#0b7af9', end: '#8ab6e6', middlePosition: '57', posX: 50, posY: 50 }; 
+        let lineColors = [ '#ff0080', '#f7f7f7', '#ffffff', '#ffffff' ];
+        let lineAlignments = ['flex-start', 'flex-start', 'flex-start', 'flex-start'];
+        let mainTitlePositions = {};
+        let shareTextPositions = {};
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            loadSettingsFromLocal();
+
+            document.querySelectorAll('.cover-container').forEach(container => {
+                const ratio = container.dataset.ratio;
+                const mainTitle = container.querySelector('.title-main');
+                const shareText = container.querySelector('.share-text-content');
+
+                if (mainTitle) makeDraggable(mainTitle, 'mainTitle', ratio);
+                if (shareText) makeDraggable(shareText, 'shareText', ratio);
+            });
+            
+            updateAllTextPositions();
+        });
+
+        function setupEventListeners() {
+            const updateAndSave = (action) => (event) => {
+                action(event);
+                saveSettingsToLocal();
+            };
+
+            document.getElementById('styleToggle').addEventListener('change', updateAndSave(toggleStyle));
+            document.getElementById('mainTitleInput').addEventListener('input', updateAndSave(updateAllDisplays));
+            document.getElementById('shareTextInput').addEventListener('input', updateAndSave(updateAllDisplays));
+            document.getElementById('bgImageUpload').addEventListener('change', handleBackgroundImageUpload);
+            document.getElementById('removeBgImage').addEventListener('click', updateAndSave(removeBackgroundImage));
+            document.getElementById('fontSelector').addEventListener('change', updateAndSave(updateAllDisplays));
+            
+            ['toggleGrid', 'toggleCorners', 'toggleAccents'].forEach(id => {
+                document.getElementById(id).addEventListener('change', updateAndSave(updateDecorativeElements));
+            });
+            
+            ['gradientStartColorPicker', 'gradientMiddleColorPicker', 'gradientEndColorPicker', 'gradientMiddlePositionSlider', 'gradientPosXSlider', 'gradientPosYSlider'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateAndSave(updateGradient));
+            });
+
+            document.getElementById('gradientMiddlePositionSlider').addEventListener('input', (e) => { document.getElementById('gradientMiddlePositionValue').textContent = e.target.value + '%'; });
+            document.getElementById('gradientPosXSlider').addEventListener('input', (e) => { document.getElementById('gradientPosXValue').textContent = e.target.value + '%'; });
+            document.getElementById('gradientPosYSlider').addEventListener('input', (e) => { document.getElementById('gradientPosYValue').textContent = e.target.value + '%'; });
+
+            document.getElementById('gradientPositionSelector').addEventListener('change', updateAndSave(updateGradientFromSelector));
+            
+            ['toggleNoise', 'noiseOpacitySlider', 'noiseDensitySlider', 'noiseBlendModeSelector'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateAndSave(updateNoiseOverlay));
+            });
+            
+            document.getElementById('noiseOpacitySlider').addEventListener('input', (e) => { document.getElementById('noiseOpacityValue').textContent = e.target.value + '%'; });
+            document.getElementById('noiseDensitySlider').addEventListener('input', (e) => { document.getElementById('noiseDensityValue').textContent = e.target.value + '%'; });
+            
+            document.querySelectorAll('.cover-container').forEach(container => {
+                container.addEventListener('click', (event) => { event.stopPropagation(); downloadSingleImage(container); });
+            });
+            
+            document.getElementById('exportSettingsBtn').addEventListener('click', exportSettings);
+            document.getElementById('importSettingsInput').addEventListener('change', importSettings);
+        }
+        
+        function toggleStyle() {
+            currentStyle = document.getElementById('styleToggle').checked ? 'classic' : 'pro';
+            document.body.classList.toggle('style-classic', currentStyle === 'classic');
+            updateAllDisplays();
+        }
+
+        function updateAllDisplays() {
+            applyDynamicStyling(); 
+            updateDecorativeElements();
+            
+            if (currentStyle === 'pro') {
+                updatePerLineControls();
+                updateFont();
+                updateNoiseOverlay();
+                applyBackgroundColorOrGradient();
+                updateAllTextPositions();
+            } else {
+                document.documentElement.style.setProperty('--noise-opacity', '0');
+                document.documentElement.style.setProperty('--main-font', "'Noto Sans SC', sans-serif");
+                document.querySelectorAll('.cover-container').forEach(c => c.style.background = '#000');
+                updateAllTextPositions(); 
+            }
+            
+            updateMainTitles();
+            updateShareTexts();
+        }
+
+        function updatePerLineControls() {
+            const titleText = document.getElementById('mainTitleInput').value;
+            const lines = titleText.split('\n').filter(line => line.trim());
+            const container = document.getElementById('perLineControls');
+            container.innerHTML = '<label class="input-label">标题行样式</label>';
+            const controlWrapper = document.createElement('div');
+            controlWrapper.className = 'grid grid-cols-1 gap-y-3';
+
+            lines.forEach((line, index) => {
+                const lineControlContainer = document.createElement('div');
+                lineControlContainer.className = 'flex items-center gap-3 p-2 bg-gray-800 rounded';
+
+                const label = document.createElement('label');
+                label.textContent = `第 ${index + 1} 行:`;
+                label.className = 'text-sm flex-shrink-0';
+                lineControlContainer.appendChild(label);
+
+                const colorPicker = document.createElement('input');
+                colorPicker.type = 'color';
+                colorPicker.value = lineColors[index] || '#ffffff';
+                colorPicker.className = 'w-8 h-8 p-1 bg-[#222] border border-solid border-[#444] rounded-md cursor-pointer';
+                colorPicker.addEventListener('input', (e) => {
+                    lineColors[index] = e.target.value;
+                    updateMainTitles(); 
+                    saveSettingsToLocal();
+                });
+                lineControlContainer.appendChild(colorPicker);
+
+                const alignmentContainer = document.createElement('div');
+                alignmentContainer.className = 'flex items-center justify-center gap-1';
+                
+                const alignments = [
+                    { value: 'flex-start', icon: 'fa-align-left' },
+                    { value: 'center', icon: 'fa-align-center' },
+                    { value: 'flex-end', icon: 'fa-align-right' }
+                ];
+
+                alignments.forEach(align => {
+                    const btn = document.createElement('button');
+                    const currentAlignment = lineAlignments[index] || 'flex-start';
+                    btn.className = `p-1 w-7 h-7 rounded text-white ${currentAlignment === align.value ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'}`;
+                    btn.innerHTML = `<i class="fas ${align.icon}"></i>`;
+                    btn.onclick = () => {
+                        lineAlignments[index] = align.value;
+                        updateMainTitles();
+                        updatePerLineControls();
+                        saveSettingsToLocal();
+                    };
+                    alignmentContainer.appendChild(btn);
+                });
+                lineControlContainer.appendChild(alignmentContainer);
+                controlWrapper.appendChild(lineControlContainer);
+            });
+            container.appendChild(controlWrapper);
+        }
+        
+        function updateMainTitles() {
+            const titleText = document.getElementById('mainTitleInput').value;
+            const lines = titleText.split('\n').filter(line => line.trim()).slice(0, 4);
+            document.querySelectorAll('[data-target="main-title"]').forEach(titleDisplay => {
+                titleDisplay.innerHTML = '';
+                lines.forEach((line, index) => {
+                    const span = document.createElement('span');
+                    span.className = 'title-line';
+                    if (currentStyle === 'pro') {
+                        span.style.color = lineColors[index] || '#ffffff';
+                        span.style.justifyContent = lineAlignments[index] || 'flex-start';
+                    } else {
+                        span.style.color = '';
+                        span.style.justifyContent = '';
+                    }
+                    span.textContent = line.trim();
+                    titleDisplay.appendChild(span);
+                });
+            });
+        }
+
+        function updateShareTexts() {
+            const shareTextRaw = document.getElementById('shareTextInput').value;
+            document.querySelectorAll('[data-target="share-text"]').forEach(shareDisplay => {
+                if (currentStyle === 'classic') {
+                    const lines = shareTextRaw.split(' ').filter(line => line.trim()).slice(0, 2);
+                    while (lines.length < 2) { lines.push(''); }
+                    
+                    const processedLines = lines; // Bug Fix: Remove character limit
+
+                    shareDisplay.innerHTML = '';
+                    shareDisplay.style.cssText = '';
+
+                    processedLines.forEach(line => {
+                        const div = document.createElement('div');
+                        div.className = 'text-row';
+                        div.textContent = line;
+                        shareDisplay.appendChild(div);
+                    });
+                } else {
+                    shareDisplay.innerHTML = shareTextRaw;
+                    shareDisplay.style.cssText = '';
+                }
+            });
+        }
+
+        function applyDynamicStyling() {
+            const titleText = document.getElementById('mainTitleInput').value;
+            const shareText = document.getElementById('shareTextInput').value;
+            const combinedLength = titleText.length + shareText.length;
+            const accentColor = config.accentColors[combinedLength % config.accentColors.length];
+            document.documentElement.style.setProperty('--accent-color', accentColor);
+            const r = parseInt(accentColor.slice(1, 3), 16);
+            const g = parseInt(accentColor.slice(3, 5), 16);
+            const b = parseInt(accentColor.slice(5, 7), 16);
+            document.documentElement.style.setProperty('--accent-shadow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+        }
+        
+        function updateFont() {
+            if (currentStyle === 'classic') return;
+            const selectedFont = document.getElementById('fontSelector').value;
+            document.documentElement.style.setProperty('--main-font', `'${selectedFont}', sans-serif`);
+        }
+
+        function updateDecorativeElements() {
+            const showGrid = document.getElementById('toggleGrid').checked;
+            const showCorners = document.getElementById('toggleCorners').checked;
+            const showAccents = document.getElementById('toggleAccents').checked;
+            document.querySelectorAll('.grid-overlay').forEach(el => el.style.display = showGrid ? 'block' : 'none');
+            document.querySelectorAll('.corner-frame').forEach(el => el.style.display = showCorners ? 'block' : 'none');
+            document.querySelectorAll('.accent-line').forEach(el => el.style.display = showAccents ? 'block' : 'none');
+        }
+
+        function updateGradient() {
+            if (currentStyle === 'classic') return;
+            currentGradient.start = document.getElementById('gradientStartColorPicker').value;
+            currentGradient.middle = document.getElementById('gradientMiddleColorPicker').value;
+            currentGradient.end = document.getElementById('gradientEndColorPicker').value;
+            currentGradient.middlePosition = document.getElementById('gradientMiddlePositionSlider').value;
+            currentGradient.posX = document.getElementById('gradientPosXSlider').value;
+            currentGradient.posY = document.getElementById('gradientPosYSlider').value;
+            document.getElementById('gradientPositionSelector').value = 'custom'; 
+            currentBackgroundImage = '';
+            document.getElementById('bgImageUpload').value = '';
+            applyBackgroundColorOrGradient();
+        }
+        
+        function updateGradientFromSelector() {
+            if (currentStyle === 'classic') return;
+            const selectorValue = document.getElementById('gradientPositionSelector').value;
+            if (selectorValue === 'custom') return;
+            const positions = {
+                'center': { x: 50, y: 50 }, 'top left': { x: 0, y: 0 },
+                'top right': { x: 100, y: 0 }, 'bottom left': { x: 0, y: 100 },
+                'bottom right': { x: 100, y: 100 }
+            };
+            const { x, y } = positions[selectorValue];
+            document.getElementById('gradientPosXSlider').value = x;
+            document.getElementById('gradientPosYSlider').value = y;
+            document.getElementById('gradientPosXValue').textContent = x + '%';
+            document.getElementById('gradientPosYValue').textContent = y + '%';
+            currentGradient.posX = x;
+            currentGradient.posY = y;
+            applyBackgroundColorOrGradient();
+        }
+        
+        function setGradientPreset(index) {
+            if (currentStyle === 'classic') return;
+            const preset = config.gradientPresets[index];
+            if (!preset) return;
+            currentGradient = {...preset};
+            document.getElementById('gradientStartColorPicker').value = preset.start;
+            document.getElementById('gradientMiddleColorPicker').value = preset.middle;
+            document.getElementById('gradientEndColorPicker').value = preset.end;
+            document.getElementById('gradientMiddlePositionSlider').value = preset.middlePosition;
+            document.getElementById('gradientMiddlePositionValue').textContent = preset.middlePosition + '%';
+            document.getElementById('gradientPosXSlider').value = preset.posX;
+            document.getElementById('gradientPosYSlider').value = preset.posY;
+            document.getElementById('gradientPosXValue').textContent = preset.posX + '%';
+            document.getElementById('gradientPosYValue').textContent = preset.posY + '%';
+            document.getElementById('gradientPositionSelector').value = 'center';
+            currentBackgroundImage = '';
+            document.getElementById('bgImageUpload').value = '';
+            applyBackgroundColorOrGradient();
+        }
+
+        function applyBackgroundColorOrGradient() {
+            if (currentStyle === 'classic') return;
+            const gradientValue = `radial-gradient(circle at ${currentGradient.posX}% ${currentGradient.posY}%, ${currentGradient.start} 0%, ${currentGradient.middle} ${currentGradient.middlePosition}%, ${currentGradient.end} 100%)`;
+            document.querySelectorAll('.cover-container').forEach(container => {
+                container.style.background = currentBackgroundImage ? '' : gradientValue;
+            });
+            applyBackgroundImage();
+        }
+
+        function handleBackgroundImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                currentBackgroundImage = e.target.result;
+                applyBackgroundColorOrGradient();
+                saveSettingsToLocal();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function applyBackgroundImage() {
+            document.querySelectorAll('.main-cover, .share-cover, .single-main-cover').forEach(part => {
+                if (currentBackgroundImage && currentStyle === 'pro') {
+                    part.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${currentBackgroundImage})`;
+                    part.style.backgroundSize = 'cover';
+                    part.style.backgroundPosition = 'center';
+                } else {
+                    part.style.backgroundImage = '';
+                }
+            });
+        }
+
+        function removeBackgroundImage() {
+            currentBackgroundImage = '';
+            document.getElementById('bgImageUpload').value = '';
+            applyBackgroundColorOrGradient();
+        }
+        
+        function updateNoiseOverlay() {
+            if (currentStyle === 'classic') return;
+            const showNoise = document.getElementById('toggleNoise').checked;
+            const opacity = (document.getElementById('noiseOpacitySlider').value / 100).toFixed(2);
+            const baseFrequency = (document.getElementById('noiseDensitySlider').value / 100).toFixed(2);
+            const noiseBlendMode = document.getElementById('noiseBlendModeSelector').value;
+            document.documentElement.style.setProperty('--noise-opacity', showNoise ? opacity : '0');
+            document.documentElement.style.setProperty('--noise-base-frequency', baseFrequency);
+            document.documentElement.style.setProperty('--noise-blend-mode', noiseBlendMode);
+        }
+
+        function makeDraggable(element, type, ratio) {
+            if (!element) return;
+            let isDragging = false;
+            let parentRect;
+
+            element.addEventListener('click', function(e) { e.stopPropagation(); });
+
+            const onMouseDown = (e) => {
+                if (currentStyle === 'classic') return;
+                e.preventDefault(); 
+                isDragging = true;
+                parentRect = element.parentElement.getBoundingClientRect();
+                element.style.cursor = 'grabbing';
+            };
+
+            const onMouseMove = (e) => {
+                if (!isDragging) return;
+                let newLeftPx = e.clientX - parentRect.left;
+                let newTopPx = e.clientY - parentRect.top;
+                
+                newLeftPx = Math.max(0, Math.min(newLeftPx, parentRect.width));
+                newTopPx = Math.max(0, Math.min(newTopPx, parentRect.height));
+
+                const newLeftPercent = (newLeftPx / parentRect.width) * 100;
+                const newTopPercent = (newTopPx / parentRect.height) * 100;
+
+                element.style.left = `${newLeftPercent}%`;
+                element.style.top = `${newTopPercent}%`;
+
+                const pos = { left: newLeftPercent, top: newTopPercent };
+                if (type === 'mainTitle') {
+                    mainTitlePositions[ratio] = pos;
+                    if (ratio === '3.35:1') document.getElementById('mainTitlePosIndicator').textContent = `L: ${pos.left.toFixed(0)}%, T: ${pos.top.toFixed(0)}%`;
+                } else {
+                    shareTextPositions[ratio] = pos;
+                    if (ratio === '3.35:1') document.getElementById('shareTextPosIndicator').textContent = `L: ${pos.left.toFixed(0)}%, T: ${pos.top.toFixed(0)}%`;
+                }
+            };
+
+            const onMouseUp = () => {
+                if (isDragging) {
+                    isDragging = false;
+                    element.style.cursor = 'grab';
+                    saveSettingsToLocal();
+                }
+            };
+
+            element.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function updateAllTextPositions() {
+            if (currentStyle === 'classic') {
+                document.querySelectorAll('[data-target="main-title"], [data-target="share-text"]').forEach(el => {
+                    el.style.left = '';
+                    el.style.top = '';
+                });
+                return;
+            };
+
+            document.querySelectorAll('.cover-container').forEach(container => {
+                const ratio = container.dataset.ratio;
+                const mainTitleEl = container.querySelector('[data-target="main-title"]');
+                const shareTextEl = container.querySelector('[data-target="share-text"]');
+
+                if (mainTitleEl && mainTitlePositions[ratio]) {
+                    mainTitleEl.style.left = `${mainTitlePositions[ratio].left}%`;
+                    mainTitleEl.style.top = `${mainTitlePositions[ratio].top}%`;
+                }
+                if (shareTextEl && shareTextPositions[ratio]) {
+                    shareTextEl.style.left = `${shareTextPositions[ratio].left}%`;
+                    shareTextEl.style.top = `${shareTextPositions[ratio].top}%`;
+                }
+            });
+
+            const mainPos = mainTitlePositions['3.35:1'] || config.defaultTitlePos;
+            document.getElementById('mainTitlePosIndicator').textContent = `L: ${mainPos.left.toFixed(0)}%, T: ${mainPos.top.toFixed(0)}%`;
+            
+            const sharePos = shareTextPositions['3.35:1'] || config.defaultSharePos;
+            if(document.querySelector('.cover-container[data-ratio="3.35:1"] .share-text-content')) {
+                 document.getElementById('shareTextPosIndicator').textContent = `L: ${sharePos.left.toFixed(0)}%, T: ${sharePos.top.toFixed(0)}%`;
+            }
+        }
+
+
+        function gatherCurrentSettings() {
+            return {
+                style: currentStyle,
+                mainTitle: document.getElementById('mainTitleInput').value,
+                shareText: document.getElementById('shareTextInput').value,
+                lineColors, 
+                lineAlignments,
+                mainTitlePositions, 
+                shareTextPositions,
+                font: document.getElementById('fontSelector').value,
+                showGrid: document.getElementById('toggleGrid').checked,
+                showCorners: document.getElementById('toggleCorners').checked,
+                showAccents: document.getElementById('toggleAccents').checked,
+                gradient: currentGradient,
+                showNoise: document.getElementById('toggleNoise').checked,
+                noiseOpacity: document.getElementById('noiseOpacitySlider').value,
+                noiseDensity: document.getElementById('noiseDensitySlider').value,
+                noiseBlendMode: document.getElementById('noiseBlendModeSelector').value,
+                backgroundImage: currentBackgroundImage
+            };
+        }
+
+        function applySettings(settings) {
+            if (!settings) return;
+            
+            currentStyle = settings.style || 'pro';
+            document.getElementById('styleToggle').checked = currentStyle === 'classic';
+            document.body.classList.toggle('style-classic', currentStyle === 'classic');
+
+            document.getElementById('mainTitleInput').value = settings.mainTitle || '';
+            document.getElementById('shareTextInput').value = settings.shareText || '';
+            lineColors = settings.lineColors || ['#ff0080', '#f7f7f7', '#ffffff', '#ffffff'];
+            lineAlignments = settings.lineAlignments || ['flex-start', 'flex-start', 'flex-start', 'flex-start'];
+            
+            mainTitlePositions = settings.mainTitlePositions || {};
+            shareTextPositions = settings.shareTextPositions || {};
+
+            document.querySelectorAll('.cover-container').forEach(container => {
+                const ratio = container.dataset.ratio;
+                if (!mainTitlePositions[ratio]) mainTitlePositions[ratio] = { ...config.defaultTitlePos };
+                if (container.querySelector('.share-text-content') && !shareTextPositions[ratio]) {
+                    shareTextPositions[ratio] = { ...config.defaultSharePos };
+                }
+            });
+            
+            document.getElementById('fontSelector').value = settings.font || 'Hui Wen Ming Chao Ti';
+            document.getElementById('toggleGrid').checked = settings.showGrid !== false;
+            document.getElementById('toggleCorners').checked = settings.showCorners !== false;
+            document.getElementById('toggleAccents').checked = settings.showAccents !== false;
+            
+            currentGradient = settings.gradient || { ...config.gradientPresets[0] };
+            document.getElementById('gradientStartColorPicker').value = currentGradient.start;
+            document.getElementById('gradientMiddleColorPicker').value = currentGradient.middle;
+            document.getElementById('gradientEndColorPicker').value = currentGradient.end;
+            document.getElementById('gradientMiddlePositionSlider').value = currentGradient.middlePosition;
+            document.getElementById('gradientMiddlePositionValue').textContent = currentGradient.middlePosition + '%';
+            document.getElementById('gradientPosXSlider').value = currentGradient.posX;
+            document.getElementById('gradientPosYSlider').value = currentGradient.posY;
+            document.getElementById('gradientPosXValue').textContent = currentGradient.posX + '%';
+            document.getElementById('gradientPosYValue').textContent = currentGradient.posY + '%';
+
+            document.getElementById('toggleNoise').checked = settings.showNoise !== false;
+            document.getElementById('noiseOpacitySlider').value = settings.noiseOpacity || 5;
+            document.getElementById('noiseDensitySlider').value = settings.noiseDensity || 8;
+            document.getElementById('noiseBlendModeSelector').value = settings.noiseBlendMode || 'overlay';
+            currentBackgroundImage = settings.backgroundImage || '';
+            
+            updateAllDisplays();
+        }
+
+        function saveSettingsToLocal() {
+            const settings = gatherCurrentSettings();
+            const { backgroundImage, ...settingsToSave } = settings;
+            localStorage.setItem('coverGeneratorSettings', JSON.stringify(settingsToSave));
+            if (backgroundImage) {
+                localStorage.setItem('coverGeneratorBackgroundImage', backgroundImage);
+            } else {
+                localStorage.removeItem('coverGeneratorBackgroundImage');
+            }
+        }
+
+        function loadSettingsFromLocal() {
+            const savedSettings = localStorage.getItem('coverGeneratorSettings');
+            if (savedSettings) {
+                try {
+                    const settings = JSON.parse(savedSettings);
+                    settings.backgroundImage = localStorage.getItem('coverGeneratorBackgroundImage') || '';
+                    applySettings(settings);
+                } catch (e) {
+                    console.error("Failed to parse settings:", e);
+                    applySettings({}); // Load defaults if parsing fails
+                }
+            } else {
+                applySettings({}); // Load defaults if no settings found
+            }
+        }
+
+        function exportSettings() {
+            const settingsString = JSON.stringify(gatherCurrentSettings(), null, 2);
+            const blob = new Blob([settingsString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `cover-settings-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importSettings(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const settings = JSON.parse(e.target.result);
+                    applySettings(settings);
+                    saveSettingsToLocal();
+                } catch (error) {
+                    alert('导入失败：无效的配置文件。');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        async function downloadSingleImage(container) {
+            await document.fonts.ready;
+            container.style.transform = 'none';
+            container.style.boxShadow = 'none';
+            const canvas = await html2canvas(container, { scale: 3, useCORS: true, backgroundColor: currentStyle === 'classic' ? '#000000' : null });
+            container.style.transform = '';
+            container.style.boxShadow = '';
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = `cover-${container.dataset.ratio.replace(':', 'x')}-${Date.now()}.png`;
+            link.click();
+        }
+
+        async function downloadAllImages() {
+            await document.fonts.ready;
+            const zip = new JSZip();
+            const downloadButton = document.querySelector('.download-btn');
+            const originalButtonText = downloadButton.innerHTML;
+            
+            downloadButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>正在生成...';
+            downloadButton.disabled = true;
+
+            for (const container of document.querySelectorAll('.cover-container')) {
+                const canvas = await html2canvas(container, { scale: 3, useCORS: true, backgroundColor: currentStyle === 'classic' ? '#000000' : null });
+                const imgData = canvas.toDataURL('image/png').split(',')[1];
+                zip.file(`cover-${container.dataset.ratio.replace(':', 'x')}.png`, imgData, { base64: true });
+            }
+
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = `covers-${Date.now()}.zip`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }).finally(() => {
+                downloadButton.innerHTML = originalButtonText;
+                downloadButton.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
+
