@@ -394,7 +394,7 @@
                 updateAllTextPositions();
             } else {
                 document.documentElement.style.setProperty('--noise-opacity', '0');
-                document.documentElement.style.setProperty('--main-font', "'Noto Sans SC', sans-serif");
+                updateFont();
                 document.querySelectorAll('.cover-container').forEach(c => c.style.background = '#000');
                 updateAllTextPositions(); 
             }
@@ -518,7 +518,6 @@
         }
         
         function updateFont() {
-            if (currentStyle === 'classic') return;
             const selectedFont = document.getElementById('fontSelector').value;
             document.documentElement.style.setProperty('--main-font', `'${selectedFont}', sans-serif`);
         }
